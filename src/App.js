@@ -1,85 +1,75 @@
-import React, { useEffect, useRef, useState } from "react";
-import io from "socket.io-client";
-import SimplePeer from "simple-peer";
-import "./App.css";
+import React, { useState, useEffect, useRef } from 'react';
+import { io } from 'socket.io-client';
 
-const socket = io("https://video-call-server-lzaj.onrender.com", {
-  transports: ["websocket"], // Force WebSocket for better connection stability
-});
+const socket = io("https://video-call-server-lzaj.onrender.com");
 
-
-
-function App() {
-  const [roomID] = useState("room1");
-  const localVideo = useRef();
-  const remoteVideo = useRef();
-  const peerRef = useRef();
-  console.log("Connected to socket:", socket.id);
-  useEffect(() => {
-    socket.on("connect", () => {
-      console.log("Connected to socket:", socket.id); // This should log the socket ID when connected
-    });
-  
-    socket.on("disconnect", () => {
-      console.log("Disconnected from socket");
-    });
-  
-    return () => {
-      socket.off("connect");
-      socket.off("disconnect");
-    };
-  }, []);
+const App = () => {
+  const [stream, setStream] = useState(null);
+  const localVideoRef = useRef(null);
+  const remoteVideoRef = useRef(null);
+  const peerRef = useRef(null);
+  const mySocketId = useRef(null);
 
   useEffect(() => {
-    navigator.mediaDevices.getUserMedia({ video: true, audio: true }).then((stream) => {
-      localVideo.current.srcObject = stream;
-
-      socket.emit("join", roomID);
-
-      socket.on("user-joined", (id) => {
-        const peer = createPeer(id, stream);
-        peerRef.current = peer;
+    // Get User Media (camera and microphone)
+    navigator.mediaDevices.getUserMedia({ video: true, audio: true })
+      .then((userStream) => {
+        setStream(userStream);
+        localVideoRef.current.srcObject = userStream;
+      })
+      .catch((error) => {
+        console.error("Error getting media:", error);
       });
 
-      socket.on("signal", ({ from, signal }) => {
-        if (!peerRef.current) {
-          const peer = createPeer(from, stream, true);
-          peerRef.current = peer;
-        }
+    // Socket.IO event when another user joins
+    socket.on('user-joined', (id) => {
+      console.log("A new user joined with ID:", id);
+      mySocketId.current = id;
+
+      // Create peer connection when new user joins
+      const peer = createPeer(id, stream);
+      peerRef.current = peer;
+    });
+
+    // Handle signaling from other peer (when offer/answer is received)
+    socket.on('signal', ({ from, signal }) => {
+      if (from !== mySocketId.current) {
         peerRef.current.signal(signal);
-      });
+      }
     });
 
+    // Clean up on unmount
     return () => {
-      socket.disconnect();
+      socket.off('user-joined');
+      socket.off('signal');
     };
-  }, []);
+  }, [stream]);
 
-  const createPeer = (id, stream, isReceiver = false) => {
-    const peer = new SimplePeer({
-      initiator: !isReceiver,
+  const createPeer = (id, userStream) => {
+    const peer = new Peer({
+      initiator: true,
       trickle: false,
-      stream,
+      stream: userStream,
     });
 
-    peer.on("signal", (signal) => {
-      socket.emit("signal", { signal, roomID, to: id });
+    peer.on('signal', (signalData) => {
+      socket.emit('signal', { to: id, signal: signalData });
     });
 
-    peer.on("stream", (remoteStream) => {
-      remoteVideo.current.srcObject = remoteStream;
+    peer.on('stream', (remoteStream) => {
+      console.log('Received remote stream');
+      remoteVideoRef.current.srcObject = remoteStream;
     });
 
     return peer;
   };
 
   return (
-    <div className="App">
-      <h2>Free Video Call</h2>
-      <video ref={localVideo} autoPlay muted playsInline />
-      <video ref={remoteVideo} autoPlay playsInline />
+    <div>
+      <video ref={localVideoRef} autoPlay muted />
+      <video ref={remoteVideoRef} autoPlay />
     </div>
   );
-}
+};
 
 export default App;
