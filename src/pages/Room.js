@@ -10,12 +10,26 @@ function Room() {
   const [peers, setPeers] = useState([]);
   const [isMuted, setIsMuted] = useState(false);
   const [isVideoOff, setIsVideoOff] = useState(false);
+  const [isFrontCamera, setIsFrontCamera] = useState(true);  // Track which camera is active
   const peersRef = useRef([]);
   const localVideoRef = useRef();
   const localStreamRef = useRef();
+  const videoDeviceIdRef = useRef(null);  // To store the current video device ID
 
   useEffect(() => {
-    navigator.mediaDevices.getUserMedia({ video: true, audio: true }).then((stream) => {
+    // Function to get available video devices (cameras)
+    const getAvailableCameras = async () => {
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const videoDevices = devices.filter(device => device.kind === 'videoinput');
+      return videoDevices;
+    };
+
+    // Start video stream with the current device
+    const startStream = async (deviceId = null) => {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { deviceId: deviceId || undefined },
+        audio: true,
+      });
       localVideoRef.current.srcObject = stream;
       localStreamRef.current = stream;
 
@@ -51,6 +65,14 @@ function Room() {
         peersRef.current = peersRef.current.filter(p => p.peerID !== userID);
         setPeers(users => users.filter(p => p.peerID !== userID));
       });
+    };
+
+    // Start with the first available camera
+    getAvailableCameras().then(cameras => {
+      if (cameras.length > 0) {
+        videoDeviceIdRef.current = cameras[0].deviceId;  // Store the device ID of the front camera
+        startStream(cameras[0].deviceId);
+      }
     });
 
     return () => {
@@ -88,6 +110,22 @@ function Room() {
     setIsVideoOff(!isVideoOff);
   };
 
+  const switchCamera = async () => {
+    const videoDevices = await navigator.mediaDevices.enumerateDevices();
+    const nextDevice = videoDevices.find(device => device.kind === 'videoinput' && device.deviceId !== videoDeviceIdRef.current);
+
+    if (nextDevice) {
+      // Stop the current video tracks
+      const currentStream = localStreamRef.current;
+      currentStream.getTracks().forEach(track => track.stop());
+
+      // Start stream with new camera
+      videoDeviceIdRef.current = nextDevice.deviceId;
+      startStream(nextDevice.deviceId);
+      setIsFrontCamera(!isFrontCamera);
+    }
+  };
+
   return (
     <div className="room-container">
       <div className="video-grid">
@@ -104,6 +142,7 @@ function Room() {
       <div className="controls">
         <button className="control-btn" onClick={toggleMute}>{isMuted ? "Unmute" : "Mute"}</button>
         <button className="control-btn" onClick={toggleVideo}>{isVideoOff ? "Turn Video On" : "Turn Video Off"}</button>
+        <button className="control-btn" onClick={switchCamera}>{isFrontCamera ? "Switch to Back Camera" : "Switch to Front Camera"}</button>
       </div>
     </div>
   );

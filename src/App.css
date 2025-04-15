@@ -84,3 +84,21 @@ video {
 .control-btn:focus {
   outline: none;
 }
+/* Camera Switch Button */
+.control-btn {
+  padding: 10px 20px;
+  background-color: #3498db;
+  color: white;
+  font-size: 16px;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.control-btn:hover {
+  background-color: #2980b9;
+}
+
+.control-btn:focus {
+  outline: none;
+}
