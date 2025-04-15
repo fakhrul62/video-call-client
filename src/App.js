@@ -3,7 +3,7 @@ import io from "socket.io-client";
 import SimplePeer from "simple-peer";
 import "./App.css";
 
-const socket = io("http://localhost:5000", {
+const socket = io("https://video-call-server-lzaj.onrender.com", {
   transports: ["websocket"], // Force WebSocket for better connection stability
 });
 
