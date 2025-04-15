@@ -11,16 +11,32 @@ const Room = () => {
   const localVideoRef = useRef();
   const localStreamRef = useRef();
   const peersRef = useRef([]);
+  const videoDeviceIdRef = useRef();
 
-  const ROOM_ID = window.location.pathname.split("/")[2];
+  const ROOM_ID = window.location.pathname.split("/")[2]; // /room/:id
 
   useEffect(() => {
     const init = async () => {
-      const stream = await startStream(isFrontCamera);
-      localStreamRef.current = stream;
-      localVideoRef.current.srcObject = stream;
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: true,
+        audio: true,
+      });
 
-      socketRef.current = io("https://video-call-server-lzaj.onrender.com");
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const videoDevices = devices.filter(
+        (device) => device.kind === "videoinput"
+      );
+
+      if (videoDevices.length > 0) {
+        videoDeviceIdRef.current = videoDevices[0].deviceId;
+      }
+
+      localStreamRef.current = stream;
+      if (localVideoRef.current) {
+        localVideoRef.current.srcObject = stream;
+      }
+
+      socketRef.current = io("https://video-call-server-lzaj.onrender.com"); // your backend URL
 
       socketRef.current.on("connect", () => {
         setMyID(socketRef.current.id);
@@ -29,7 +45,7 @@ const Room = () => {
 
       socketRef.current.on("all-users", (users) => {
         const newPeers = [];
-        users.forEach(userID => {
+        users.forEach((userID) => {
           const peer = createPeer(userID, socketRef.current.id, stream);
           peersRef.current.push({ peerID: userID, peer });
           newPeers.push({ peerID: userID, peer });
@@ -37,74 +53,31 @@ const Room = () => {
         setPeers(newPeers);
       });
 
-      socketRef.current.on("user-joined", userID => {
+      socketRef.current.on("user-joined", (userID) => {
         const peer = addPeer(userID, stream);
         peersRef.current.push({ peerID: userID, peer });
-        setPeers(prev => [...prev, { peerID: userID, peer }]);
+        setPeers((prev) => [...prev, { peerID: userID, peer }]);
       });
 
       socketRef.current.on("signal", ({ from, signal }) => {
-        const item = peersRef.current.find(p => p.peerID === from);
+        const item = peersRef.current.find((p) => p.peerID === from);
         if (item) item.peer.signal(signal);
       });
 
-      socketRef.current.on("user-disconnected", userID => {
-        const item = peersRef.current.find(p => p.peerID === userID);
+      socketRef.current.on("user-disconnected", (userID) => {
+        const item = peersRef.current.find((p) => p.peerID === userID);
         if (item) {
           item.peer.destroy();
-          peersRef.current = peersRef.current.filter(p => p.peerID !== userID);
-          setPeers(prev => prev.filter(p => p.peerID !== userID));
+          peersRef.current = peersRef.current.filter(
+            (p) => p.peerID !== userID
+          );
+          setPeers((prev) => prev.filter((p) => p.peerID !== userID));
         }
       });
     };
 
     init();
   }, []);
-
-  const startStream = async (useFront = true) => {
-    return await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: useFront ? "user" : "environment" },
-      audio: true,
-    });
-  };
-
-  const switchCamera = async () => {
-    try {
-      const newStream = await startStream(!isFrontCamera);
-      const newVideoTrack = newStream.getVideoTracks()[0];
-      const oldStream = localStreamRef.current;
-      const oldVideoTrack = oldStream.getVideoTracks()[0];
-
-      // Replace video track in local stream
-      oldStream.removeTrack(oldVideoTrack);
-      oldStream.addTrack(newVideoTrack);
-
-      // Replace video track in each peer connection
-      peersRef.current.forEach(({ peer }) => {
-        const sender = peer._pc.getSenders().find(s => s.track?.kind === "video");
-        if (sender) sender.replaceTrack(newVideoTrack);
-      });
-
-      // Update local video
-      if (localVideoRef.current) {
-        localVideoRef.current.pause();
-        localVideoRef.current.srcObject = null;
-        localVideoRef.current.srcObject = oldStream;
-        localVideoRef.current.load();
-        localVideoRef.current.play();
-      }
-
-      // Clean up old track
-      oldVideoTrack.stop();
-      localStreamRef.current = oldStream;
-      setIsFrontCamera(prev => !prev);
-
-      console.log("✅ Camera switched");
-    } catch (err) {
-      console.error("❌ Error switching camera:", err);
-      alert("Failed to switch camera: " + err.message);
-    }
-  };
 
   const createPeer = (userToSignal, callerID, stream) => {
     const peer = new SimplePeer({
@@ -113,7 +86,7 @@ const Room = () => {
       stream,
     });
 
-    peer.on("signal", signal => {
+    peer.on("signal", (signal) => {
       socketRef.current.emit("signal", {
         to: userToSignal,
         from: callerID,
@@ -131,7 +104,7 @@ const Room = () => {
       stream,
     });
 
-    peer.on("signal", signal => {
+    peer.on("signal", (signal) => {
       socketRef.current.emit("signal", {
         to: incomingID,
         from: socketRef.current.id,
@@ -142,8 +115,75 @@ const Room = () => {
     return peer;
   };
 
+  const switchCamera = async () => {
+    try {
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const videoDevices = devices.filter((d) => d.kind === "videoinput");
+
+      if (videoDevices.length < 2) {
+        alert("Only one camera found");
+        return;
+      }
+
+      const currentId = videoDeviceIdRef.current;
+      const currentIndex = videoDevices.findIndex(
+        (d) => d.deviceId === currentId
+      );
+      const nextIndex = (currentIndex + 1) % videoDevices.length;
+      const nextDevice = videoDevices[nextIndex];
+
+      // Stop all tracks before getting new stream
+      if (localStreamRef.current) {
+        localStreamRef.current.getTracks().forEach(track => track.stop());
+      }
+
+      // Get entirely new stream with new camera
+      const newStream = await navigator.mediaDevices.getUserMedia({
+        video: { 
+          deviceId: { exact: nextDevice.deviceId },
+          // Add these constraints to help with mobile back cameras
+          width: { ideal: 1280 },
+          height: { ideal: 720 }
+        },
+        audio: true,
+      });
+
+      // Replace the entire stream reference
+      localStreamRef.current = newStream;
+
+      // Update local video display
+      if (localVideoRef.current) {
+        localVideoRef.current.srcObject = newStream;
+      }
+
+      // Replace tracks in all peer connections
+      const videoTrack = newStream.getVideoTracks()[0];
+      peersRef.current.forEach(({ peer }) => {
+        const senders = peer._pc.getSenders();
+        const sender = senders.find(s => s.track && s.track.kind === "video");
+        if (sender) {
+          sender.replaceTrack(videoTrack);
+        }
+      });
+
+      videoDeviceIdRef.current = nextDevice.deviceId;
+      setIsFrontCamera(!isFrontCamera);
+      console.log("✅ Camera switched:", nextDevice.label);
+    } catch (err) {
+      console.error("❌ Camera switch error:", err);
+      alert("Failed to switch camera: " + err.message);
+    }
+  };
+
   return (
-    <div style={{ display: "flex", flexWrap: "wrap", gap: "10px", padding: "20px" }}>
+    <div
+      style={{
+        display: "flex",
+        flexWrap: "wrap",
+        gap: "10px",
+        padding: "20px",
+      }}
+    >
       <div>
         <video
           ref={localVideoRef}
@@ -172,7 +212,7 @@ const Video = ({ peer }) => {
   const ref = useRef();
 
   useEffect(() => {
-    peer.on("stream", stream => {
+    peer.on("stream", (stream) => {
       if (ref.current) {
         ref.current.srcObject = stream;
       }
