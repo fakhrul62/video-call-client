@@ -3,7 +3,9 @@ import io from "socket.io-client";
 import SimplePeer from "simple-peer";
 import "./App.css";
 
-const socket = io("https://video-call-server-lzaj.onrender.com");
+const socket = io("http://localhost:5000", {
+  transports: ["websocket"], // Force WebSocket for better connection stability
+});
 
 
 
@@ -13,6 +15,20 @@ function App() {
   const remoteVideo = useRef();
   const peerRef = useRef();
   console.log("Connected to socket:", socket.id);
+  useEffect(() => {
+    socket.on("connect", () => {
+      console.log("Connected to socket:", socket.id); // This should log the socket ID when connected
+    });
+  
+    socket.on("disconnect", () => {
+      console.log("Disconnected from socket");
+    });
+  
+    return () => {
+      socket.off("connect");
+      socket.off("disconnect");
+    };
+  }, []);
 
   useEffect(() => {
     navigator.mediaDevices.getUserMedia({ video: true, audio: true }).then((stream) => {
