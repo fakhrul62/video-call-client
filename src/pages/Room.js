@@ -140,7 +140,7 @@ function Room() {
       </div>
       
       <div className="controls">
-        <button className="control-btn" onClick={toggleMute}>{isMuted ? "Unmute" : "Mute"}</button>
+        <button className="control-btn" onClick={toggleMute}>{isMuted ? "Mute" : "Unmute"}</button>
         <button className="control-btn" onClick={toggleVideo}>{isVideoOff ? "Turn Video On" : "Turn Video Off"}</button>
         <button className="control-btn" onClick={switchCamera}>{isFrontCamera ? "Switch to Back Camera" : "Switch to Front Camera"}</button>
       </div>
