@@ -3,7 +3,8 @@ import io from "socket.io-client";
 import SimplePeer from "simple-peer";
 import "./App.css";
 
-const socket = io("YOUR_RENDER_BACKEND_URL"); // replace later
+const socket = io("https://video-signal-server.onrender.com");
+
 
 function App() {
   const [roomID] = useState("room1");
