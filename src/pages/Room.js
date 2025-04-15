@@ -8,6 +8,8 @@ const socket = io("https://video-call-server-lzaj.onrender.com");
 function Room() {
   const { roomId } = useParams();
   const [peers, setPeers] = useState([]);
+  const [isMuted, setIsMuted] = useState(false);  // Mute state
+  const [isVideoOff, setIsVideoOff] = useState(false);  // Video state
   const peersRef = useRef([]);
   const localVideoRef = useRef();
   const localStreamRef = useRef();
@@ -72,12 +74,30 @@ function Room() {
     return peer;
   };
 
+  const toggleMute = () => {
+    const stream = localStreamRef.current;
+    const audioTracks = stream.getAudioTracks();
+    audioTracks.forEach(track => track.enabled = !isMuted);  // Toggle audio track
+    setIsMuted(!isMuted);
+  };
+
+  const toggleVideo = () => {
+    const stream = localStreamRef.current;
+    const videoTracks = stream.getVideoTracks();
+    videoTracks.forEach(track => track.enabled = !isVideoOff);  // Toggle video track
+    setIsVideoOff(!isVideoOff);
+  };
+
   return (
     <div>
       <video ref={localVideoRef} autoPlay muted />
       {peers.map(({ peerID, peer }) => (
         <Video key={peerID} peer={peer} />
       ))}
+      <div className="controls">
+        <button onClick={toggleMute}>{isMuted ? "Unmute" : "Mute"}</button>
+        <button onClick={toggleVideo}>{isVideoOff ? "Turn Video On" : "Turn Video Off"}</button>
+      </div>
     </div>
   );
 }
