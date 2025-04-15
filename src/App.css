@@ -103,6 +103,9 @@ body {
 
 /* Video Containers */
 .video-container {
+  flex: 1 1 calc(25% - 20px); /* 4 items per row, minus gap */
+  max-width: calc(25% - 20px); 
+  box-sizing: border-box;
   position: relative;
   border-radius: var(--border-radius);
   overflow: hidden;
