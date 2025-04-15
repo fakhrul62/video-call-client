@@ -26,13 +26,13 @@ const Room = () => {
 
   const socketRef = useRef();
   const localVideoRef = useRef();
+  const pinnedLocalVideoRef = useRef();
   const localStreamRef = useRef();
   const peersRef = useRef([]);
   const videoDeviceIdRef = useRef();
   const audioDeviceIdRef = useRef();
   const chatInputRef = useRef();
   const chatMessagesRef = useRef();
-  const pinnedVideoRef = useRef();
 
   useEffect(() => {
     const init = async () => {
@@ -61,6 +61,10 @@ const Room = () => {
         localStreamRef.current = stream;
         if (localVideoRef.current) {
           localVideoRef.current.srcObject = stream;
+        }
+        // Also set the pinned local video reference if it exists
+        if (pinnedLocalVideoRef.current) {
+          pinnedLocalVideoRef.current.srcObject = stream;
         }
 
         socketRef.current = io("https://video-call-server-lzaj.onrender.com"); // your backend URL
@@ -149,6 +153,13 @@ const Room = () => {
     }
   }, [messages]);
 
+  // Update pinned local video whenever the local stream changes
+  useEffect(() => {
+    if (pinnedLocalVideoRef.current && localStreamRef.current) {
+      pinnedLocalVideoRef.current.srcObject = localStreamRef.current;
+    }
+  }, [pinnedVideo]);
+
   const createPeer = (userToSignal, callerID, stream) => {
     const peer = new SimplePeer({
       initiator: true,
@@ -228,9 +239,12 @@ const Room = () => {
       // Replace the entire stream reference
       localStreamRef.current = newStream;
 
-      // Update local video display
+      // Update local video displays
       if (localVideoRef.current) {
         localVideoRef.current.srcObject = newStream;
+      }
+      if (pinnedLocalVideoRef.current) {
+        pinnedLocalVideoRef.current.srcObject = newStream;
       }
 
       // Replace tracks in all peer connections
@@ -365,12 +379,11 @@ const Room = () => {
               // Show pinned local video
               <React.Fragment>
                 <video
-                  ref={pinnedVideoRef}
+                  ref={pinnedLocalVideoRef}
                   autoPlay
                   playsInline
                   muted
                   className="pinned-video"
-                  srcObject={localStreamRef.current}
                 />
                 <div className="username-label">You</div>
                 <button onClick={() => pinVideo(null)} className="unpin-button">
@@ -398,9 +411,9 @@ const Room = () => {
 
         {/* Video Grid (shown differently when a video is pinned) */}
         <div className={`video-grid ${pinnedVideo ? 'minimized-grid' : ''}`}>
-          {/* Local Video */}
+          {/* Local Video - Always show in grid regardless of whether it's pinned */}
           <div 
-            className={`video-container ${pinnedVideo === 'local' ? 'hidden' : ''} ${pinnedVideo ? 'minimized' : ''}`}
+            className={`video-container ${pinnedVideo ? 'minimized' : ''}`}
             onClick={() => pinnedVideo !== 'local' && pinVideo('local')}
           >
             <video
@@ -428,16 +441,14 @@ const Room = () => {
 
           {/* Peer Videos */}
           {peers.map(({ peerID, peer }) => (
-            pinnedVideo !== peerID && (
-              <PeerVideo 
-                key={peerID} 
-                peer={peer} 
-                peerID={peerID}
-                isPinned={false}
-                minimized={!!pinnedVideo}
-                onPinVideo={() => pinVideo(peerID)}
-              />
-            )
+            // Always show all peer videos in the grid, even if one is pinned
+            <PeerVideo 
+              key={peerID} 
+              peer={peer} 
+              peerID={peerID}
+              minimized={!!pinnedVideo}
+              onPinVideo={() => pinVideo(peerID)}
+            />
           ))}
         </div>
       </div>
@@ -585,6 +596,17 @@ const PeerVideo = ({ peer, peerID, minimized, onPinVideo }) => {
         videoRef.current.srcObject = stream;
       }
     });
+    
+    // Force remounting if needed to ensure stream is applied
+    return () => {
+      if (videoRef.current && videoRef.current.srcObject) {
+        const tracks = videoRef.current.srcObject.getTracks();
+        tracks.forEach(track => {
+          // Just clean up references, don't stop the tracks as they're used elsewhere
+          track.onended = null;
+        });
+      }
+    };
   }, [peer]);
 
   return (
@@ -613,11 +635,28 @@ const PinnedPeerVideo = ({ peer, peerID, unpinVideo }) => {
   const videoRef = useRef();
 
   useEffect(() => {
-    peer.on("stream", (stream) => {
+    // Important: This will ensure we properly capture and display the stream
+    const handleStream = (stream) => {
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
+        
+        // Sometimes the video doesn't play immediately, force it
+        videoRef.current.play().catch(e => {
+          console.warn("Auto-play prevented:", e);
+        });
       }
-    });
+    };
+
+    peer.on("stream", handleStream);
+    
+    // If we already have a stream, use it (needed for re-renders)
+    if (peer._remoteStreams && peer._remoteStreams.length > 0) {
+      handleStream(peer._remoteStreams[0]);
+    }
+
+    return () => {
+      peer.off("stream", handleStream);
+    };
   }, [peer]);
 
   return (
