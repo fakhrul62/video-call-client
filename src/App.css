@@ -95,7 +95,7 @@ body {
 
 /* Video Grid */
 .video-grid {
-  display: grid;
+  display: flex;
   grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
   gap: 20px;
   margin-bottom: 20px;
@@ -108,7 +108,7 @@ body {
   overflow: hidden;
   background-color: var(--dark-bg);
   box-shadow: var(--shadow);
-  aspect-ratio: auto;
+  aspect-ratio: 16 / 9;
 }
 
 .local-video-container {
@@ -200,6 +200,7 @@ body {
 
 .controls-right {
   margin-left: auto;
+  display: flex;
 }
 
 /* Control Buttons */
