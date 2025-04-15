@@ -108,6 +108,7 @@ body {
   overflow: hidden;
   background-color: var(--dark-bg);
   box-shadow: var(--shadow);
+  aspect-ratio: auto;
 }
 
 .local-video-container {
