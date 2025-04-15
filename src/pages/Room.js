@@ -23,7 +23,9 @@ const Room = () => {
       });
 
       const devices = await navigator.mediaDevices.enumerateDevices();
-      const videoDevices = devices.filter(device => device.kind === "videoinput");
+      const videoDevices = devices.filter(
+        (device) => device.kind === "videoinput"
+      );
 
       if (videoDevices.length > 0) {
         videoDeviceIdRef.current = videoDevices[0].deviceId;
@@ -43,7 +45,7 @@ const Room = () => {
 
       socketRef.current.on("all-users", (users) => {
         const newPeers = [];
-        users.forEach(userID => {
+        users.forEach((userID) => {
           const peer = createPeer(userID, socketRef.current.id, stream);
           peersRef.current.push({ peerID: userID, peer });
           newPeers.push({ peerID: userID, peer });
@@ -51,23 +53,25 @@ const Room = () => {
         setPeers(newPeers);
       });
 
-      socketRef.current.on("user-joined", userID => {
+      socketRef.current.on("user-joined", (userID) => {
         const peer = addPeer(userID, stream);
         peersRef.current.push({ peerID: userID, peer });
-        setPeers(prev => [...prev, { peerID: userID, peer }]);
+        setPeers((prev) => [...prev, { peerID: userID, peer }]);
       });
 
       socketRef.current.on("signal", ({ from, signal }) => {
-        const item = peersRef.current.find(p => p.peerID === from);
+        const item = peersRef.current.find((p) => p.peerID === from);
         if (item) item.peer.signal(signal);
       });
 
-      socketRef.current.on("user-disconnected", userID => {
-        const item = peersRef.current.find(p => p.peerID === userID);
+      socketRef.current.on("user-disconnected", (userID) => {
+        const item = peersRef.current.find((p) => p.peerID === userID);
         if (item) {
           item.peer.destroy();
-          peersRef.current = peersRef.current.filter(p => p.peerID !== userID);
-          setPeers(prev => prev.filter(p => p.peerID !== userID));
+          peersRef.current = peersRef.current.filter(
+            (p) => p.peerID !== userID
+          );
+          setPeers((prev) => prev.filter((p) => p.peerID !== userID));
         }
       });
     };
@@ -82,7 +86,7 @@ const Room = () => {
       stream,
     });
 
-    peer.on("signal", signal => {
+    peer.on("signal", (signal) => {
       socketRef.current.emit("signal", {
         to: userToSignal,
         from: callerID,
@@ -100,7 +104,7 @@ const Room = () => {
       stream,
     });
 
-    peer.on("signal", signal => {
+    peer.on("signal", (signal) => {
       socketRef.current.emit("signal", {
         to: incomingID,
         from: socketRef.current.id,
@@ -114,49 +118,74 @@ const Room = () => {
   const switchCamera = async () => {
     try {
       const devices = await navigator.mediaDevices.enumerateDevices();
-      const videoDevices = devices.filter(device => device.kind === 'videoinput');
+      const videoDevices = devices.filter((d) => d.kind === "videoinput");
 
       if (videoDevices.length < 2) {
-        console.warn("Only one camera available.");
+        alert("Only one camera found");
         return;
       }
 
       const currentId = videoDeviceIdRef.current;
-      const nextDevice = videoDevices.find(d => d.deviceId !== currentId) || videoDevices[0];
+      const currentIndex = videoDevices.findIndex(
+        (d) => d.deviceId === currentId
+      );
+      const nextIndex = (currentIndex + 1) % videoDevices.length;
+      const nextDevice = videoDevices[nextIndex];
 
       const newStream = await navigator.mediaDevices.getUserMedia({
         video: { deviceId: { exact: nextDevice.deviceId } },
-        audio: false,
+        audio: true,
       });
 
       const newVideoTrack = newStream.getVideoTracks()[0];
-      const oldVideoTrack = localStreamRef.current.getVideoTracks()[0];
+      const oldStream = localStreamRef.current;
+      const oldVideoTrack = oldStream.getVideoTracks()[0];
 
-      localStreamRef.current.removeTrack(oldVideoTrack);
-      localStreamRef.current.addTrack(newVideoTrack);
+      // Replace track in local stream
+      oldStream.removeTrack(oldVideoTrack);
+      oldStream.addTrack(newVideoTrack);
 
+      // Replace track in peer connections
       peersRef.current.forEach(({ peer }) => {
-        const sender = peer._pc.getSenders().find(s => s.track && s.track.kind === 'video');
-        if (sender) sender.replaceTrack(newVideoTrack);
+        const sender = peer._pc
+          .getSenders()
+          .find((s) => s.track && s.track.kind === "video");
+        if (sender) {
+          sender.replaceTrack(newVideoTrack);
+        }
       });
 
+      // Update local video display
       if (localVideoRef.current) {
         localVideoRef.current.srcObject = null;
-        localVideoRef.current.srcObject = localStreamRef.current;
+        localVideoRef.current.srcObject = oldStream;
       }
+      localVideoRef.current.pause();
+      localVideoRef.current.srcObject = null;
+      localVideoRef.current.srcObject = oldStream;
+      localVideoRef.current.load();
+      localVideoRef.current.play();
 
+      // Clean up old track
       oldVideoTrack.stop();
       videoDeviceIdRef.current = nextDevice.deviceId;
-      setIsFrontCamera(prev => !prev);
-      console.log("✅ Switched to:", nextDevice.label);
+      setIsFrontCamera((prev) => !prev);
+      console.log("✅ Camera switched:", nextDevice.label);
     } catch (err) {
-      console.error("❌ Error switching camera:", err);
-      alert("Camera switch failed: " + err.message);
+      console.error("❌ Camera switch error:", err);
+      alert("Failed to switch camera: " + err.message);
     }
   };
 
   return (
-    <div style={{ display: "flex", flexWrap: "wrap", gap: "10px", padding: "20px" }}>
+    <div
+      style={{
+        display: "flex",
+        flexWrap: "wrap",
+        gap: "10px",
+        padding: "20px",
+      }}
+    >
       <div>
         <video
           ref={localVideoRef}
@@ -185,7 +214,7 @@ const Video = ({ peer }) => {
   const ref = useRef();
 
   useEffect(() => {
-    peer.on("stream", stream => {
+    peer.on("stream", (stream) => {
       if (ref.current) {
         ref.current.srcObject = stream;
       }
