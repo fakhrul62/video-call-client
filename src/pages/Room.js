@@ -8,8 +8,8 @@ const socket = io("https://video-call-server-lzaj.onrender.com");
 function Room() {
   const { roomId } = useParams();
   const [peers, setPeers] = useState([]);
-  const [isMuted, setIsMuted] = useState(false);  // Mute state
-  const [isVideoOff, setIsVideoOff] = useState(false);  // Video state
+  const [isMuted, setIsMuted] = useState(false);
+  const [isVideoOff, setIsVideoOff] = useState(false);
   const peersRef = useRef([]);
   const localVideoRef = useRef();
   const localStreamRef = useRef();
@@ -77,26 +77,33 @@ function Room() {
   const toggleMute = () => {
     const stream = localStreamRef.current;
     const audioTracks = stream.getAudioTracks();
-    audioTracks.forEach(track => track.enabled = !isMuted);  // Toggle audio track
+    audioTracks.forEach(track => track.enabled = !isMuted);
     setIsMuted(!isMuted);
   };
 
   const toggleVideo = () => {
     const stream = localStreamRef.current;
     const videoTracks = stream.getVideoTracks();
-    videoTracks.forEach(track => track.enabled = !isVideoOff);  // Toggle video track
+    videoTracks.forEach(track => track.enabled = !isVideoOff);
     setIsVideoOff(!isVideoOff);
   };
 
   return (
-    <div>
-      <video ref={localVideoRef} autoPlay muted />
-      {peers.map(({ peerID, peer }) => (
-        <Video key={peerID} peer={peer} />
-      ))}
+    <div className="room-container">
+      <div className="video-grid">
+        <div className="local-video-container">
+          <video ref={localVideoRef} autoPlay muted />
+        </div>
+        {peers.map(({ peerID, peer }) => (
+          <div className="peer-video-container" key={peerID}>
+            <Video peer={peer} />
+          </div>
+        ))}
+      </div>
+      
       <div className="controls">
-        <button onClick={toggleMute}>{isMuted ? "Unmute" : "Mute"}</button>
-        <button onClick={toggleVideo}>{isVideoOff ? "Turn Video On" : "Turn Video Off"}</button>
+        <button className="control-btn" onClick={toggleMute}>{isMuted ? "Unmute" : "Mute"}</button>
+        <button className="control-btn" onClick={toggleVideo}>{isVideoOff ? "Turn Video On" : "Turn Video Off"}</button>
       </div>
     </div>
   );

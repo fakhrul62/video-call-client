@@ -16,3 +16,71 @@ button {
 button:hover {
   background-color: #2980b9;
 }
+/* Main Room Container */
+.room-container {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  height: 100vh;
+  padding: 10px;
+}
+
+/* Video Grid */
+.video-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+/* Local Video Container */
+.local-video-container {
+  position: relative;
+  width: 100%;
+  max-width: 320px;
+  margin: 0 auto;
+}
+
+/* Peer Video Containers */
+.peer-video-container {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+/* Video Styling */
+video {
+  width: 100%;
+  height: auto;
+  border-radius: 10px;
+}
+
+/* Control Bar */
+.controls {
+  display: flex;
+  justify-content: center;
+  gap: 20px;
+  background-color: rgba(0, 0, 0, 0.5);
+  padding: 10px;
+  border-radius: 10px;
+}
+
+/* Button Styles */
+.control-btn {
+  padding: 10px 20px;
+  background-color: #4CAF50;
+  color: white;
+  font-size: 16px;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.control-btn:hover {
+  background-color: #45a049;
+}
+
+.control-btn:focus {
+  outline: none;
+}
