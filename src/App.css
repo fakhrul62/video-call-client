@@ -482,7 +482,10 @@ body {
   .video-grid {
     grid-template-columns: 1fr;
   }
-  
+  .video-container {
+    flex: 1 1 calc(50% - 20px);
+    max-width: calc(50% - 20px);
+  }
   .control-bar {
     padding: 10px;
   }
@@ -699,4 +702,10 @@ body {
 
 .mb-2 {
   margin-bottom: 10px;
+}
+@media (max-width: 480px) {
+  .video-container {
+    flex: 1 1 100%;
+    max-width: 100%;
+  }
 }
