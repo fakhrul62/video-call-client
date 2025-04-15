@@ -4,7 +4,7 @@ import io from "socket.io-client";
 import { useParams, useNavigate } from "react-router-dom";
 import { 
   Video, Mic, MicOff, VideoOff, Phone, MessageSquare, 
-  Settings, X, Copy, Users, CameraRotate, Send 
+  Settings, X, Copy, Users, Repeat, Send 
 } from "lucide-react";
 
 const Room = () => {
@@ -373,7 +373,7 @@ const Room = () => {
       <div className="control-bar">
         <div className="controls-left">
           <button onClick={switchCamera} className="control-btn btn-with-label">
-            <CameraRotate size={20} />
+            <Repeat size={20} />
             <span className="btn-label">{isFrontCamera ? "Back" : "Front"}</span>
           </button>
         </div>
