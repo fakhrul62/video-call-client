@@ -4,7 +4,7 @@ import io from "socket.io-client";
 import { useParams, useNavigate } from "react-router-dom";
 import { 
   Video, Mic, MicOff, VideoOff, Phone, MessageSquare, 
-  Settings, X, Copy, Users, Repeat, Send 
+  Settings, X, Copy, Users, Repeat, Send, Maximize, Minimize
 } from "lucide-react";
 
 const Room = () => {
@@ -22,6 +22,7 @@ const Room = () => {
   const [messageInput, setMessageInput] = useState("");
   const [participantCount, setParticipantCount] = useState(1);
   const [toast, setToast] = useState({ show: false, message: "", type: "" });
+  const [pinnedVideo, setPinnedVideo] = useState(null); // null when no video is pinned
 
   const socketRef = useRef();
   const localVideoRef = useRef();
@@ -31,6 +32,7 @@ const Room = () => {
   const audioDeviceIdRef = useRef();
   const chatInputRef = useRef();
   const chatMessagesRef = useRef();
+  const pinnedVideoRef = useRef();
 
   useEffect(() => {
     const init = async () => {
@@ -102,6 +104,12 @@ const Room = () => {
             );
             setPeers((prev) => prev.filter((p) => p.peerID !== userID));
             setParticipantCount(prev => prev - 1);
+            
+            // If the pinned user disconnects, unpin
+            if (pinnedVideo === userID) {
+              setPinnedVideo(null);
+            }
+            
             showToast("Participant left", "error");
           }
         });
@@ -322,6 +330,15 @@ const Room = () => {
     }
   };
 
+  // Function to handle pinning a video
+  const pinVideo = (id) => {
+    if (pinnedVideo === id) {
+      setPinnedVideo(null); // Unpin if already pinned
+    } else {
+      setPinnedVideo(id);
+    }
+  };
+
   return (
     <div className="room-container">
       {/* Room Header */}
@@ -341,9 +358,51 @@ const Room = () => {
 
       {/* Video Section */}
       <div className="video-section">
-        <div className="video-grid">
+        {/* Pinned Video Display */}
+        {pinnedVideo && (
+          <div className="pinned-video-container">
+            {pinnedVideo === "local" ? (
+              // Show pinned local video
+              <React.Fragment>
+                <video
+                  ref={pinnedVideoRef}
+                  autoPlay
+                  playsInline
+                  muted
+                  className="pinned-video"
+                  srcObject={localStreamRef.current}
+                />
+                <div className="username-label">You</div>
+                <button onClick={() => pinVideo(null)} className="unpin-button">
+                  <Minimize size={20} />
+                </button>
+              </React.Fragment>
+            ) : (
+              // Show pinned peer video
+              peers.map(({ peerID, peer }) => {
+                if (peerID === pinnedVideo) {
+                  return (
+                    <PinnedPeerVideo 
+                      key={peerID} 
+                      peer={peer} 
+                      peerID={peerID} 
+                      unpinVideo={() => pinVideo(null)}
+                    />
+                  );
+                }
+                return null;
+              })
+            )}
+          </div>
+        )}
+
+        {/* Video Grid (shown differently when a video is pinned) */}
+        <div className={`video-grid ${pinnedVideo ? 'minimized-grid' : ''}`}>
           {/* Local Video */}
-          <div className="video-container">
+          <div 
+            className={`video-container ${pinnedVideo === 'local' ? 'hidden' : ''} ${pinnedVideo ? 'minimized' : ''}`}
+            onClick={() => pinnedVideo !== 'local' && pinVideo('local')}
+          >
             <video
               ref={localVideoRef}
               autoPlay
@@ -353,18 +412,32 @@ const Room = () => {
             />
             <div className="username-label">You</div>
             <div className="video-controls-overlay">
-              <button onClick={toggleVideo} className={`control-btn ${!isVideoEnabled ? 'off' : ''}`}>
+              <button onClick={(e) => {e.stopPropagation(); toggleVideo();}} className={`control-btn ${!isVideoEnabled ? 'off' : ''}`}>
                 {isVideoEnabled ? <Video size={18} /> : <VideoOff size={18} />}
               </button>
-              <button onClick={toggleAudio} className={`control-btn ${!isAudioEnabled ? 'off' : ''}`}>
+              <button onClick={(e) => {e.stopPropagation(); toggleAudio();}} className={`control-btn ${!isAudioEnabled ? 'off' : ''}`}>
                 {isAudioEnabled ? <Mic size={18} /> : <MicOff size={18} />}
               </button>
+              {!pinnedVideo && (
+                <button onClick={(e) => {e.stopPropagation(); pinVideo('local');}} className="control-btn">
+                  <Maximize size={18} />
+                </button>
+              )}
             </div>
           </div>
 
           {/* Peer Videos */}
           {peers.map(({ peerID, peer }) => (
-            <PeerVideo key={peerID} peer={peer} peerID={peerID} />
+            pinnedVideo !== peerID && (
+              <PeerVideo 
+                key={peerID} 
+                peer={peer} 
+                peerID={peerID}
+                isPinned={false}
+                minimized={!!pinnedVideo}
+                onPinVideo={() => pinVideo(peerID)}
+              />
+            )
           ))}
         </div>
       </div>
@@ -503,7 +576,7 @@ const Room = () => {
 };
 
 // Peer Video Component
-const PeerVideo = ({ peer, peerID }) => {
+const PeerVideo = ({ peer, peerID, minimized, onPinVideo }) => {
   const videoRef = useRef();
 
   useEffect(() => {
@@ -515,7 +588,10 @@ const PeerVideo = ({ peer, peerID }) => {
   }, [peer]);
 
   return (
-    <div className="video-container">
+    <div 
+      className={`video-container ${minimized ? 'minimized' : ''}`}
+      onClick={onPinVideo}
+    >
       <video
         ref={videoRef}
         autoPlay
@@ -523,6 +599,39 @@ const PeerVideo = ({ peer, peerID }) => {
         className="video"
       />
       <div className="username-label">User {peerID.slice(0, 4)}</div>
+      <div className="video-controls-overlay">
+        <button onClick={(e) => {e.stopPropagation(); onPinVideo();}} className="control-btn">
+          <Maximize size={18} />
+        </button>
+      </div>
+    </div>
+  );
+};
+
+// Pinned Peer Video Component
+const PinnedPeerVideo = ({ peer, peerID, unpinVideo }) => {
+  const videoRef = useRef();
+
+  useEffect(() => {
+    peer.on("stream", (stream) => {
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+      }
+    });
+  }, [peer]);
+
+  return (
+    <div className="pinned-peer-container">
+      <video
+        ref={videoRef}
+        autoPlay
+        playsInline
+        className="pinned-video"
+      />
+      <div className="username-label">User {peerID.slice(0, 4)}</div>
+      <button onClick={unpinVideo} className="unpin-button">
+        <Minimize size={20} />
+      </button>
     </div>
   );
 };
