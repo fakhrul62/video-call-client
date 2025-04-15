@@ -1,190 +1,187 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { useParams } from 'react-router-dom';
-import { io } from 'socket.io-client';
-import Peer from 'simple-peer';
+import React, { useEffect, useRef, useState } from "react";
+import SimplePeer from "simple-peer";
+import io from "socket.io-client";
 
-const socket = io("https://video-call-server-lzaj.onrender.com");
-
-function Room() {
-  const { roomId } = useParams();
+const Room = () => {
+  const [myID, setMyID] = useState("");
   const [peers, setPeers] = useState([]);
-  const [isMuted, setIsMuted] = useState(false);
-  const [isVideoOff, setIsVideoOff] = useState(false);
   const [isFrontCamera, setIsFrontCamera] = useState(true);
 
-  const peersRef = useRef([]);
+  const socketRef = useRef();
   const localVideoRef = useRef();
   const localStreamRef = useRef();
-  const videoDeviceIdRef = useRef(null);
+  const peersRef = useRef([]);
+  const videoDeviceIdRef = useRef();
+
+  const ROOM_ID = window.location.pathname.split("/")[2]; // /room/:id
+
+  useEffect(() => {
+    const init = async () => {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: true,
+        audio: true,
+      });
+
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const videoDevices = devices.filter(device => device.kind === "videoinput");
+
+      if (videoDevices.length > 0) {
+        videoDeviceIdRef.current = videoDevices[0].deviceId;
+      }
+
+      localStreamRef.current = stream;
+      if (localVideoRef.current) {
+        localVideoRef.current.srcObject = stream;
+      }
+
+      socketRef.current = io("https://video-call-server-lzaj.onrender.com"); // your backend URL
+
+      socketRef.current.on("connect", () => {
+        setMyID(socketRef.current.id);
+        socketRef.current.emit("join", ROOM_ID);
+      });
+
+      socketRef.current.on("all-users", (users) => {
+        const newPeers = [];
+        users.forEach(userID => {
+          const peer = createPeer(userID, socketRef.current.id, stream);
+          peersRef.current.push({ peerID: userID, peer });
+          newPeers.push({ peerID: userID, peer });
+        });
+        setPeers(newPeers);
+      });
+
+      socketRef.current.on("user-joined", userID => {
+        const peer = addPeer(userID, stream);
+        peersRef.current.push({ peerID: userID, peer });
+        setPeers(prev => [...prev, { peerID: userID, peer }]);
+      });
+
+      socketRef.current.on("signal", ({ from, signal }) => {
+        const item = peersRef.current.find(p => p.peerID === from);
+        if (item) item.peer.signal(signal);
+      });
+
+      socketRef.current.on("user-disconnected", userID => {
+        const item = peersRef.current.find(p => p.peerID === userID);
+        if (item) {
+          item.peer.destroy();
+          peersRef.current = peersRef.current.filter(p => p.peerID !== userID);
+          setPeers(prev => prev.filter(p => p.peerID !== userID));
+        }
+      });
+    };
+
+    init();
+  }, []);
 
   const createPeer = (userToSignal, callerID, stream) => {
-    const peer = new Peer({ initiator: true, trickle: false, stream });
+    const peer = new SimplePeer({
+      initiator: true,
+      trickle: false,
+      stream,
+    });
 
     peer.on("signal", signal => {
-      socket.emit("signal", { to: userToSignal, from: callerID, signal });
+      socketRef.current.emit("signal", {
+        to: userToSignal,
+        from: callerID,
+        signal,
+      });
     });
 
     return peer;
   };
 
   const addPeer = (incomingID, stream) => {
-    const peer = new Peer({ initiator: false, trickle: false, stream });
+    const peer = new SimplePeer({
+      initiator: false,
+      trickle: false,
+      stream,
+    });
 
     peer.on("signal", signal => {
-      socket.emit("signal", { to: incomingID, from: socket.id, signal });
+      socketRef.current.emit("signal", {
+        to: incomingID,
+        from: socketRef.current.id,
+        signal,
+      });
     });
 
     return peer;
   };
 
-  const startStream = async (deviceId = null) => {
-    const stream = await navigator.mediaDevices.getUserMedia({
-      video: { deviceId: deviceId ? { exact: deviceId } : undefined },
-      audio: true,
-    });
-
-    localStreamRef.current = stream;
-    if (localVideoRef.current) {
-      localVideoRef.current.srcObject = stream;
-    }
-
-    socket.emit("join", roomId);
-
-    socket.on("all-users", (users) => {
-      const newPeers = users.map(userID => {
-        const peer = createPeer(userID, socket.id, stream);
-        peersRef.current.push({ peerID: userID, peer });
-        return { peerID: userID, peer };
-      });
-      setPeers(newPeers);
-    });
-
-    socket.on("user-joined", (userID) => {
-      const peer = addPeer(userID, stream);
-      peersRef.current.push({ peerID: userID, peer });
-      setPeers(users => [...users, { peerID: userID, peer }]);
-    });
-
-    socket.on("signal", ({ from, signal }) => {
-      const item = peersRef.current.find(p => p.peerID === from);
-      if (item) {
-        item.peer.signal(signal);
-      }
-    });
-
-    socket.on("user-disconnected", (userID) => {
-      const item = peersRef.current.find(p => p.peerID === userID);
-      if (item) item.peer.destroy();
-
-      peersRef.current = peersRef.current.filter(p => p.peerID !== userID);
-      setPeers(users => users.filter(p => p.peerID !== userID));
-    });
-  };
-
-  useEffect(() => {
-    const getAvailableCameras = async () => {
+  const switchCamera = async () => {
+    try {
       const devices = await navigator.mediaDevices.enumerateDevices();
       const videoDevices = devices.filter(device => device.kind === 'videoinput');
-      return videoDevices;
-    };
 
-    getAvailableCameras().then(cameras => {
-      if (cameras.length > 0) {
-        videoDeviceIdRef.current = cameras[0].deviceId;
-        startStream(cameras[0].deviceId);
+      if (videoDevices.length < 2) {
+        console.warn("Only one camera available.");
+        return;
       }
-    });
 
-    return () => {
-      socket.disconnect();
-    };
-  }, [roomId]);
+      const currentId = videoDeviceIdRef.current;
+      const nextDevice = videoDevices.find(d => d.deviceId !== currentId) || videoDevices[0];
 
-  const toggleMute = () => {
-    const audioTracks = localStreamRef.current.getAudioTracks();
-    audioTracks.forEach(track => track.enabled = isMuted);
-    setIsMuted(!isMuted);
-  };
-
-  const toggleVideo = () => {
-    const videoTracks = localStreamRef.current.getVideoTracks();
-    videoTracks.forEach(track => track.enabled = isVideoOff);
-    setIsVideoOff(!isVideoOff);
-  };
-
-  const switchCamera = async () => {
-    const devices = await navigator.mediaDevices.enumerateDevices();
-    const videoDevices = devices.filter(device => device.kind === 'videoinput');
-  
-    if (videoDevices.length < 2) return;
-  
-    const currentId = videoDeviceIdRef.current;
-    const nextDevice = videoDevices.find(d => d.deviceId !== currentId);
-  
-    if (!nextDevice) return;
-  
-    try {
       const newStream = await navigator.mediaDevices.getUserMedia({
         video: { deviceId: { exact: nextDevice.deviceId } },
-        audio: false, // no need to re-acquire audio
+        audio: false,
       });
-  
+
       const newVideoTrack = newStream.getVideoTracks()[0];
       const oldVideoTrack = localStreamRef.current.getVideoTracks()[0];
-  
-      // Replace video track in local stream
+
       localStreamRef.current.removeTrack(oldVideoTrack);
       localStreamRef.current.addTrack(newVideoTrack);
-  
-      // Replace video track in all peers
+
       peersRef.current.forEach(({ peer }) => {
-        const sender = peer._pc.getSenders().find(s => s.track.kind === 'video');
-        if (sender) {
-          sender.replaceTrack(newVideoTrack);
-        }
+        const sender = peer._pc.getSenders().find(s => s.track && s.track.kind === 'video');
+        if (sender) sender.replaceTrack(newVideoTrack);
       });
-  
-      // Update local video preview
+
       if (localVideoRef.current) {
+        localVideoRef.current.srcObject = null;
         localVideoRef.current.srcObject = localStreamRef.current;
       }
-  
-      // Stop the old track
+
       oldVideoTrack.stop();
-  
       videoDeviceIdRef.current = nextDevice.deviceId;
-      setIsFrontCamera(!isFrontCamera);
+      setIsFrontCamera(prev => !prev);
+      console.log("✅ Switched to:", nextDevice.label);
     } catch (err) {
-      console.error("Failed to switch camera:", err);
+      console.error("❌ Error switching camera:", err);
+      alert("Camera switch failed: " + err.message);
     }
   };
-  
 
   return (
-    <div className="room-container">
-      <div className="video-grid">
-        <video ref={localVideoRef} autoPlay muted playsInline className="video" />
-        {peers.map(({ peerID, peer }) => (
-          <Video key={peerID} peer={peer} />
-        ))}
+    <div style={{ display: "flex", flexWrap: "wrap", gap: "10px", padding: "20px" }}>
+      <div>
+        <video
+          ref={localVideoRef}
+          autoPlay
+          playsInline
+          muted
+          style={{ width: "300px", borderRadius: "10px", background: "#000" }}
+        />
+        <p style={{ textAlign: "center" }}>You</p>
       </div>
 
-      <div className="controls">
-        <button onClick={toggleMute}>
-          {isMuted ? "Unmute" : "Mute"}
-        </button>
-        <button onClick={toggleVideo}>
-          {isVideoOff ? "Start Video" : "Stop Video"}
-        </button>
+      {peers.map(({ peerID, peer }) => (
+        <Video key={peerID} peer={peer} />
+      ))}
+
+      <div style={{ position: "fixed", top: 10, right: 10 }}>
         <button onClick={switchCamera}>
-          {isFrontCamera ? "Switch to Back Camera" : "Switch to Front Camera"}
+          Switch to {isFrontCamera ? "Back" : "Front"} Camera
         </button>
       </div>
     </div>
   );
-}
+};
 
-function Video({ peer }) {
+const Video = ({ peer }) => {
   const ref = useRef();
 
   useEffect(() => {
@@ -195,7 +192,16 @@ function Video({ peer }) {
     });
   }, [peer]);
 
-  return <video ref={ref} autoPlay playsInline className="video" />;
-}
+  return (
+    <div>
+      <video
+        playsInline
+        autoPlay
+        ref={ref}
+        style={{ width: "300px", borderRadius: "10px", background: "#000" }}
+      />
+    </div>
+  );
+};
 
 export default Room;
