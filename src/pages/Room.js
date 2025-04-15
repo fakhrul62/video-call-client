@@ -115,21 +115,50 @@ function Room() {
   const switchCamera = async () => {
     const devices = await navigator.mediaDevices.enumerateDevices();
     const videoDevices = devices.filter(device => device.kind === 'videoinput');
-
-    const nextCamera = videoDevices.find(
-      (device) => device.deviceId !== videoDeviceIdRef.current
-    );
-
-    if (nextCamera) {
-      // Stop current video tracks
-      localStreamRef.current.getTracks().forEach(track => track.stop());
-
-      // Start new stream with next camera
-      videoDeviceIdRef.current = nextCamera.deviceId;
-      startStream(nextCamera.deviceId);
+  
+    if (videoDevices.length < 2) return;
+  
+    const currentId = videoDeviceIdRef.current;
+    const nextDevice = videoDevices.find(d => d.deviceId !== currentId);
+  
+    if (!nextDevice) return;
+  
+    try {
+      const newStream = await navigator.mediaDevices.getUserMedia({
+        video: { deviceId: { exact: nextDevice.deviceId } },
+        audio: false, // no need to re-acquire audio
+      });
+  
+      const newVideoTrack = newStream.getVideoTracks()[0];
+      const oldVideoTrack = localStreamRef.current.getVideoTracks()[0];
+  
+      // Replace video track in local stream
+      localStreamRef.current.removeTrack(oldVideoTrack);
+      localStreamRef.current.addTrack(newVideoTrack);
+  
+      // Replace video track in all peers
+      peersRef.current.forEach(({ peer }) => {
+        const sender = peer._pc.getSenders().find(s => s.track.kind === 'video');
+        if (sender) {
+          sender.replaceTrack(newVideoTrack);
+        }
+      });
+  
+      // Update local video preview
+      if (localVideoRef.current) {
+        localVideoRef.current.srcObject = localStreamRef.current;
+      }
+  
+      // Stop the old track
+      oldVideoTrack.stop();
+  
+      videoDeviceIdRef.current = nextDevice.deviceId;
       setIsFrontCamera(!isFrontCamera);
+    } catch (err) {
+      console.error("Failed to switch camera:", err);
     }
   };
+  
 
   return (
     <div className="room-container">
