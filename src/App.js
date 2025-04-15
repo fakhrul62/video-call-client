@@ -11,6 +11,7 @@ function App() {
   const localVideo = useRef();
   const remoteVideo = useRef();
   const peerRef = useRef();
+  console.log("Connected to socket:", socket.id);
 
   useEffect(() => {
     navigator.mediaDevices.getUserMedia({ video: true, audio: true }).then((stream) => {
