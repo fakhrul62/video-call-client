@@ -589,14 +589,21 @@ body {
 /* Media Queries */
 @media (max-width: 768px) {
   .video-grid {
-    display: flex;
-    flex-direction: column;
+    display: grid;
+    grid-template-columns: 1fr 1fr; /* Two items per row */
+    gap: 10px;
   }
   
   .video-container {
-    flex: 1 1 100%;
-    max-width: 100%;
+    flex: 0 0 calc(50% - 5px); /* 50% width minus half the gap */
+    max-width: calc(50% - 5px);
     margin-bottom: 10px;
+  }
+  
+  /* When grid is minimized (a video is pinned) */
+  .video-grid.minimized-grid {
+    display: flex; /* Keep the horizontal scroll for minimized grid */
+    flex-wrap: nowrap;
   }
   
   .control-bar {
