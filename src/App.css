@@ -28,7 +28,10 @@ body {
   margin: 0 auto;
   padding: 20px;
 }
-
+.logo-img{
+  width: 20px;
+  
+}
 /* Room Container */
 .room-container {
   display: flex;

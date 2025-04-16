@@ -357,7 +357,7 @@ const Room = () => {
     <div className="room-container">
       {/* Room Header */}
       <div className="room-header">
-        <div className="room-title"> <span><img src="https://i.ibb.co.com/5hShbQqK/phone-call.png" alt="RingX" /></span> </div>
+        <div className="room-title"> <span><img className="logo-img" src="https://i.ibb.co.com/5hShbQqK/phone-call.png" alt="RingX" /></span> </div>
         <div className="room-info">
           <div className="participant-count">
             <Users size={16} />
