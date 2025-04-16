@@ -74,6 +74,10 @@ const Room = () => {
           socketRef.current.emit("join", roomId);
           showToast("Connected to room", "success");
         });
+        socketRef.current.on("connect_error", (err) => {
+          console.error("Socket connection error:", err);
+          showToast("Connection error: " + err.message, "error");
+        });
 
         socketRef.current.on("all-users", (users) => {
           const newPeers = [];
@@ -165,8 +169,23 @@ const Room = () => {
       initiator: true,
       trickle: false,
       stream,
+      config: { 
+        iceServers: [
+          { urls: 'stun:stun.l.google.com:19302' },
+          { urls: 'stun:stun1.l.google.com:19302' },
+          { urls: 'stun:stun2.l.google.com:19302' },
+          { urls: 'stun:stun3.l.google.com:19302' },
+          { urls: 'stun:stun4.l.google.com:19302' },
+          // For better connectivity, add a TURN server in production
+          // {
+          //   urls: 'turn:your-turn-server.com:3478',
+          //   username: 'username',
+          //   credential: 'password'
+          // }
+        ]
+      }
     });
-
+  
     peer.on("signal", (signal) => {
       socketRef.current.emit("signal", {
         to: userToSignal,
@@ -174,17 +193,32 @@ const Room = () => {
         signal,
       });
     });
-
+  
     return peer;
   };
-
+  
   const addPeer = (incomingID, stream) => {
     const peer = new SimplePeer({
       initiator: false,
       trickle: false,
       stream,
+      config: { 
+        iceServers: [
+          { urls: 'stun:stun.l.google.com:19302' },
+          { urls: 'stun:stun1.l.google.com:19302' },
+          { urls: 'stun:stun2.l.google.com:19302' },
+          { urls: 'stun:stun3.l.google.com:19302' },
+          { urls: 'stun:stun4.l.google.com:19302' },
+          // For better connectivity, add a TURN server in production
+          // {
+          //   urls: 'turn:your-turn-server.com:3478',
+          //   username: 'username',
+          //   credential: 'password'
+          // }
+        ]
+      }
     });
-
+  
     peer.on("signal", (signal) => {
       socketRef.current.emit("signal", {
         to: incomingID,
@@ -192,9 +226,10 @@ const Room = () => {
         signal,
       });
     });
-
+  
     return peer;
   };
+  
 
   const switchCamera = async () => {
     try {
