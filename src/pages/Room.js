@@ -174,16 +174,19 @@ const Room = () => {
   const createPeer = (userToSignal, callerID, stream) => {
     const peer = new SimplePeer({
       initiator: true,
-      trickle: false,
+      trickle: true,
       stream,
       config: { 
         iceServers: [
           { urls: 'stun:stun.l.google.com:19302' },
           { urls: 'stun:stun1.l.google.com:19302' },
           {
-            urls: 'turn:numb.viagenie.ca',
-            username: 'webrtc@live.com',
-            credential: 'muazkh'
+            urls: [
+              'turn:global.turn.twilio.com:3478?transport=udp',
+              'turn:global.turn.twilio.com:3478?transport=tcp'
+            ],
+            username: '9e0b5025454aa382e0ab97b5f13dbb95035ead373e81881f37c57bbce4dd',
+            credential: 'Mwpf61nIN3eVYGMDk8lQsHHKRzZcnl+u/jVELzZ4Rg='
           }
         ]
       }
@@ -207,16 +210,19 @@ const Room = () => {
   const addPeer = (incomingID, stream) => {
     const peer = new SimplePeer({
       initiator: false,
-      trickle: false,
+      trickle: true,
       stream,
       config: { 
         iceServers: [
           { urls: 'stun:stun.l.google.com:19302' },
           { urls: 'stun:stun1.l.google.com:19302' },
           {
-            urls: 'turn:numb.viagenie.ca',
-            username: 'webrtc@live.com',
-            credential: 'muazkh'
+            urls: [
+              'turn:global.turn.twilio.com:3478?transport=udp',
+              'turn:global.turn.twilio.com:3478?transport=tcp'
+            ],
+            username: '9e0b5025454aa382e0ab97b5f13dbb95035ead373e81881f37c57bbce4dd',
+            credential: 'Mwpf61nIN3eVYGMDk8lQsHHKRzZcnl+u/jVELzZ4Rg='
           }
         ]
       }
@@ -633,23 +639,34 @@ const PeerVideo = ({ peer, peerID, minimized, onPinVideo }) => {
   const videoRef = useRef();
 
   useEffect(() => {
-    peer.on("stream", (stream) => {
+    const handleStream = (stream) => {
+      console.log(`Received stream from peer ${peerID}:`, stream);
+      
+      if (stream.getVideoTracks().length === 0) {
+        console.warn("Received stream has no video tracks");
+      }
+      
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
-      }
-    });
-    
-    // Force remounting if needed to ensure stream is applied
-    return () => {
-      if (videoRef.current && videoRef.current.srcObject) {
-        const tracks = videoRef.current.srcObject.getTracks();
-        tracks.forEach(track => {
-          // Just clean up references, don't stop the tracks as they're used elsewhere
-          track.onended = null;
+        
+        // Force play the video
+        videoRef.current.play().catch(e => {
+          console.error("Failed to play video:", e);
         });
       }
     };
-  }, [peer]);
+    
+    peer.on("stream", handleStream);
+    
+    // If we already have the stream
+    if (peer._remoteStreams && peer._remoteStreams.length > 0) {
+      handleStream(peer._remoteStreams[0]);
+    }
+    
+    return () => {
+      peer.off("stream", handleStream);
+    };
+  }, [peer, peerID]);
 
   return (
     <div 
@@ -661,6 +678,9 @@ const PeerVideo = ({ peer, peerID, minimized, onPinVideo }) => {
         autoPlay
         playsInline
         className="video"
+        onLoadedMetadata={() => console.log(`Video from peer ${peerID} loaded metadata`)}
+        onPlay={() => console.log(`Video from peer ${peerID} started playing`)}
+        onError={(e) => console.error(`Video error for peer ${peerID}:`, e)}
       />
       <div className="username-label">User {peerID.slice(0, 4)}</div>
       <div className="video-controls-overlay">
