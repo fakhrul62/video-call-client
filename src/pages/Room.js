@@ -71,15 +71,19 @@ const Room = () => {
           transports: ['websocket', 'polling'],
           reconnection: true
         });
+        
+        console.log("Attempting to connect to socket server...");
 
         socketRef.current.on("connect", () => {
+          console.log("Socket connected with ID:", socketRef.current.id);
           setMyID(socketRef.current.id);
           socketRef.current.emit("join", roomId);
           showToast("Connected to room", "success");
         });
-        socketRef.current.on("connect_error", (err) => {
-          console.error("Socket connection error:", err);
-          showToast("Connection error: " + err.message, "error");
+        
+        socketRef.current.on("connect_error", (error) => {
+          console.error("Socket connection error:", error);
+          showToast("Connection error: " + error.message, "error");
         });
 
         socketRef.current.on("all-users", (users) => {
@@ -170,21 +174,16 @@ const Room = () => {
   const createPeer = (userToSignal, callerID, stream) => {
     const peer = new SimplePeer({
       initiator: true,
-      trickle: true,
+      trickle: false,
       stream,
       config: { 
         iceServers: [
           { urls: 'stun:stun.l.google.com:19302' },
           { urls: 'stun:stun1.l.google.com:19302' },
           {
-            urls: 'turn:openrelay.metered.ca:80',
-            username: 'openrelayproject',
-            credential: 'openrelayproject'
-          },
-          {
-            urls: 'turn:openrelay.metered.ca:443',
-            username: 'openrelayproject',
-            credential: 'openrelayproject'
+            urls: 'turn:numb.viagenie.ca',
+            username: 'webrtc@live.com',
+            credential: 'muazkh'
           }
         ]
       }
@@ -197,6 +196,10 @@ const Room = () => {
         signal,
       });
     });
+    
+    peer.on("error", (err) => {
+      console.error("Peer error:", err);
+    });
   
     return peer;
   };
@@ -204,21 +207,16 @@ const Room = () => {
   const addPeer = (incomingID, stream) => {
     const peer = new SimplePeer({
       initiator: false,
-      trickle: true,
+      trickle: false,
       stream,
       config: { 
         iceServers: [
           { urls: 'stun:stun.l.google.com:19302' },
           { urls: 'stun:stun1.l.google.com:19302' },
           {
-            urls: 'turn:openrelay.metered.ca:80',
-            username: 'openrelayproject',
-            credential: 'openrelayproject'
-          },
-          {
-            urls: 'turn:openrelay.metered.ca:443',
-            username: 'openrelayproject',
-            credential: 'openrelayproject'
+            urls: 'turn:numb.viagenie.ca',
+            username: 'webrtc@live.com',
+            credential: 'muazkh'
           }
         ]
       }
@@ -230,6 +228,10 @@ const Room = () => {
         from: socketRef.current.id,
         signal,
       });
+    });
+    
+    peer.on("error", (err) => {
+      console.error("Peer error:", err);
     });
   
     return peer;
