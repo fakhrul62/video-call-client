@@ -67,7 +67,10 @@ const Room = () => {
           pinnedLocalVideoRef.current.srcObject = stream;
         }
 
-        socketRef.current = io("https://video-call-server-lzaj.onrender.com"); // your backend URL
+        socketRef.current = io("https://video-call-server-lzaj.onrender.com", {
+          transports: ['websocket', 'polling'],
+          reconnection: true
+        });
 
         socketRef.current.on("connect", () => {
           setMyID(socketRef.current.id);
@@ -167,21 +170,22 @@ const Room = () => {
   const createPeer = (userToSignal, callerID, stream) => {
     const peer = new SimplePeer({
       initiator: true,
-      trickle: false,
+      trickle: true,
       stream,
       config: { 
         iceServers: [
           { urls: 'stun:stun.l.google.com:19302' },
           { urls: 'stun:stun1.l.google.com:19302' },
-          { urls: 'stun:stun2.l.google.com:19302' },
-          { urls: 'stun:stun3.l.google.com:19302' },
-          { urls: 'stun:stun4.l.google.com:19302' },
-          // For better connectivity, add a TURN server in production
-          // {
-          //   urls: 'turn:your-turn-server.com:3478',
-          //   username: 'username',
-          //   credential: 'password'
-          // }
+          {
+            urls: 'turn:openrelay.metered.ca:80',
+            username: 'openrelayproject',
+            credential: 'openrelayproject'
+          },
+          {
+            urls: 'turn:openrelay.metered.ca:443',
+            username: 'openrelayproject',
+            credential: 'openrelayproject'
+          }
         ]
       }
     });
@@ -200,21 +204,22 @@ const Room = () => {
   const addPeer = (incomingID, stream) => {
     const peer = new SimplePeer({
       initiator: false,
-      trickle: false,
+      trickle: true,
       stream,
       config: { 
         iceServers: [
           { urls: 'stun:stun.l.google.com:19302' },
           { urls: 'stun:stun1.l.google.com:19302' },
-          { urls: 'stun:stun2.l.google.com:19302' },
-          { urls: 'stun:stun3.l.google.com:19302' },
-          { urls: 'stun:stun4.l.google.com:19302' },
-          // For better connectivity, add a TURN server in production
-          // {
-          //   urls: 'turn:your-turn-server.com:3478',
-          //   username: 'username',
-          //   credential: 'password'
-          // }
+          {
+            urls: 'turn:openrelay.metered.ca:80',
+            username: 'openrelayproject',
+            credential: 'openrelayproject'
+          },
+          {
+            urls: 'turn:openrelay.metered.ca:443',
+            username: 'openrelayproject',
+            credential: 'openrelayproject'
+          }
         ]
       }
     });
