@@ -176,20 +176,12 @@ const Room = () => {
       initiator: true,
       trickle: true,
       stream,
-      config: { 
+      config: {
         iceServers: [
-          { urls: 'stun:stun.l.google.com:19302' },
-          { urls: 'stun:stun1.l.google.com:19302' },
-          {
-            urls: [
-              'turn:global.turn.twilio.com:3478?transport=udp',
-              'turn:global.turn.twilio.com:3478?transport=tcp'
-            ],
-            username: '9e0b5025454aa382e0ab97b5f13dbb95035ead373e81881f37c57bbce4dd',
-            credential: 'Mwpf61nIN3eVYGMDk8lQsHHKRzZcnl+u/jVELzZ4Rg='
-          }
+          { urls: 'stun:stun.l.google.com:19302' }
         ]
       }
+      
     });
   
     peer.on("signal", (signal) => {
@@ -212,20 +204,12 @@ const Room = () => {
       initiator: false,
       trickle: true,
       stream,
-      config: { 
+      config: {
         iceServers: [
-          { urls: 'stun:stun.l.google.com:19302' },
-          { urls: 'stun:stun1.l.google.com:19302' },
-          {
-            urls: [
-              'turn:global.turn.twilio.com:3478?transport=udp',
-              'turn:global.turn.twilio.com:3478?transport=tcp'
-            ],
-            username: '9e0b5025454aa382e0ab97b5f13dbb95035ead373e81881f37c57bbce4dd',
-            credential: 'Mwpf61nIN3eVYGMDk8lQsHHKRzZcnl+u/jVELzZ4Rg='
-          }
+          { urls: 'stun:stun.l.google.com:19302' }
         ]
       }
+      
     });
   
     peer.on("signal", (signal) => {
